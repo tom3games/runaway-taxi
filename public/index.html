@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>暴走タクシー | みんなで1台を運転する協力ゲーム</title>
+<meta name="description" content="3〜6人で1台のタクシーを動かす協力ゲーム。ハンドル、アクセル、ナビ、見張り、接客。担当ごとに見えるものが違うから、声をかけ合わないと曲がれない。リンクを送るだけでスマホから遊べる。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="暴走タクシー | みんなで1台を運転する協力ゲーム">
+<meta property="og:description" content="3〜6人で1台のタクシーを動かす協力ゲーム。ハンドル、アクセル、ナビ、見張り、接客。担当ごとに見えるものが違うから、声をかけ合わないと曲がれない。リンクを送るだけでスマホから遊べる。">
+<meta property="og:image" content="/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#14161c">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:title" content="暴走タクシー">
+<meta name="twitter:description" content="3〜6人で1台のタクシーを動かす協力ゲーム。ハンドル、アクセル、ナビ、見張り、接客。担当ごとに見えるものが違うから、声をかけ合わないと曲がれない。リンクを送るだけでスマホから遊べる。">
+<meta name="twitter:image" content="/og.png">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/style.css">
+<script>
+  // 起動に失敗したときに原因を画面に出す（module の読み込み自体が失敗すると中の catch は動かないため、素の script で拾う）
+  window.__errs = []
+  window.addEventListener('error', e => window.__errs.push(e.message || String(e)))
+  window.addEventListener('unhandledrejection', e => window.__errs.push(String(e.reason)))
+  setTimeout(() => {
+    if (window.__boot) return
+    const d = document.getElementById('bootErr')
+    d.hidden = false
+    d.textContent = '起動できませんでした: ' + (window.__errs.join(' / ') || '読み込み失敗') + ' / ' + navigator.userAgent
+  }, 5000)
+</script>
+<script>
+  // ピンチ・ダブルタップ・Ctrl+ホイールでの拡大を止める
+  ;['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive: false }))
+  document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault() }, { passive: false })
+  let lastTouchEnd = 0
+  document.addEventListener('touchend', e => { const now = Date.now(); if (now - lastTouchEnd < 350 && !e.target.closest('input,button,summary')) e.preventDefault(); lastTouchEnd = now }, { passive: false })
+  document.addEventListener('dblclick', e => e.preventDefault(), { passive: false })
+  window.addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault() }, { passive: false })
+  window.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && ['+', '-', '=', '0', ';'].includes(e.key)) e.preventDefault() })
+</script>
+</head>
+<body>
+<div id="bootErr" class="boot-err" hidden></div>
+
+<header class="top">
+  <span class="logo" id="logo">暴走タクシー</span>
+  <span class="net" id="net" data-s="connecting">接続しています</span>
+</header>
+
+<main>
+  <section id="home" class="card" hidden>
+    <svg class="home-art" viewBox="0 0 320 64" aria-hidden="true">
+      <rect x="0" y="40" width="320" height="24" fill="#2b2f3a"/><path d="M0 52h320" stroke="#c9b45a" stroke-width="2" stroke-dasharray="12 12"/>
+      <g transform="translate(118 18) rotate(-6)"><rect x="0" y="12" width="84" height="26" rx="8" fill="#ffcf3a"/><rect x="18" y="0" width="44" height="16" rx="5" fill="#ffcf3a"/><rect x="22" y="3" width="16" height="10" rx="2" fill="#1b2230"/><rect x="42" y="3" width="16" height="10" rx="2" fill="#1b2230"/><rect x="30" y="-7" width="20" height="8" rx="2" fill="#fff7d6"/><circle cx="20" cy="38" r="7" fill="#11141a"/><circle cx="64" cy="38" r="7" fill="#11141a"/><rect x="80" y="18" width="6" height="6" fill="#fffbe0"/><path d="M90 16 120 8M90 24l34 0M90 30l30 8" stroke="#fffbe0" stroke-width="2" opacity=".5"/></g>
+      <path d="M96 30h-26M100 40H60M94 50H74" stroke="#9aa3b2" stroke-width="3" stroke-linecap="round"/>
+    </svg>
+    <h1 id="homeTitle">暴走タクシー</h1>
+    <p id="homeLead" class="lead">みんなで1台のタクシーを運転して、お客さんを目的地まで届ける。担当ごとに見えるものが違うから、声をかけ合わないと曲がれない。</p>
+    <label class="field">ニックネーム
+      <input id="name" maxlength="12" autocomplete="nickname" placeholder="例: たろう" enterkeyhint="done">
+    </label>
+    <button id="createBtn" class="primary">部屋を作る</button>
+    <details id="joinBox">
+      <summary>参加コードで入る</summary>
+      <div class="row">
+        <input id="code" maxlength="4" inputmode="latin" autocapitalize="characters" placeholder="ABCD" aria-label="参加コード">
+        <button id="joinBtn">参加</button>
+      </div>
+    </details>
+    <div id="howto" class="howto">
+      <ul>
+        <li><b>ハンドル</b>は左右、<b>エンジン</b>はアクセルとブレーキだけ</li>
+        <li>行き先の地図は<b>ナビ</b>、夜道の障害物は<b>見張り</b>、お客さんの注文は<b>接客</b>にしか見えない</li>
+        <li>光る輪の中で止まると乗り降り。150秒で3,000円を目指す</li>
+      </ul>
+      <p class="muted">推奨3〜6人。1〜2人なら1人が複数を担当する</p>
+    </div>
+  </section>
+
+  <section id="lobby" class="card" hidden>
+    <p class="muted">参加コード</p>
+    <p class="code" id="roomCode"></p>
+    <div class="row">
+      <input id="invite" readonly aria-label="招待URL">
+      <button id="copyBtn">招待</button>
+    </div>
+    <p class="muted"><span id="count"></span></p>
+    <ul id="players" class="players"></ul>
+    <p id="lobbyHint" class="hint"></p>
+    <button id="startBtn" class="primary" hidden>スタート</button>
+    <button id="leaveBtn" class="ghost">部屋を出る</button>
+  </section>
+
+  <section id="game" hidden>
+    <div id="stage" class="stage"></div>
+    <button id="quitBtn" class="ghost small quit">退出</button>
+  </section>
+
+  <section id="result" class="card" hidden>
+    <h2 id="resultTitle" class="result-title"></h2>
+    <div id="resultBody"></div>
+    <p id="resultHint" class="hint"></p>
+    <button id="rematchBtn" class="primary" hidden>もう一回</button>
+    <button id="lobbyBtn" class="ghost" hidden>ロビーに戻る</button>
+  </section>
+</main>
+
+<div id="toast" class="toast" role="status" hidden></div>
+<footer class="foot"><span id="ping"></span></footer>
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>
