@@ -1,8 +1,8 @@
 // 暴走タクシーのルールの単体テスト（通信なし）
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createGame, assignRoles, PLAN, ROLE_KEYS, READY_SEC, TIME_LIMIT, TARGET, CONES, CALM_CD, roadDist, meta } from '../lib/game.mjs'
-import { TILES, PLACES, isSolid, tileAt, START } from '../public/map.js'
+import { createGame, assignRoles, PLAN, ROLE_KEYS, READY_SEC, TIME_LIMIT, TARGET, CONES, CALM_CD, LINGER, RED_FINE, NIGHT_RATE, PAX_TYPES, roadDist, meta } from '../lib/game.mjs'
+import { TILES, PLACES, isSolid, tileAt, START, MAPS, MAP_IDS, tileOf, inRect, lightAt, W, H } from '../public/map.js'
 
 const seq = (...xs) => { let i = 0; return () => xs[i++ % xs.length] }
 const players = n => Array.from({ length: n }, (_, i) => ({ id: 'p' + i, name: 'P' + i }))
@@ -149,6 +149,11 @@ test('機嫌が0になるとお客さんは怒って降り、運賃は入らな�
 test('時間切れで終わる。目標に届けば勝ち、届かなければ負け', () => {
   const lose = game(2)
   run(lose, READY_SEC + TIME_LIMIT + 0.2)
+  assert.equal(lose.view('p0').st, 'end', '時間切れの直後は余韻（まだ結果にしない）')
+  assert.equal(lose.view('p0').end, 'time')
+  assert.equal(lose.isOver(), false)
+  assert.equal(lose.input('p0', { type: 'calm' }).error, 'over', '余韻の間は操作できない')
+  run(lose, LINGER)
   assert.equal(lose.isOver(), true)
   assert.equal(lose.result().win, false)
   assert.equal(lose.result().title, '売上不足')
@@ -305,4 +310,240 @@ test('ブラウザから届く opts（start のおまけ）では制限時間も
   assert.equal(g.view('p0').limit, TIME_LIMIT)
   run(g, READY_SEC + 1)
   assert.equal(g.isOver(), false)
+})
+
+// ---- 街・幕・信号・工事・新しいお客さん
+const roadOf = m => (x, y) => tileOf(m, x, y) === '.'
+test('3つの街: 乗り場・コーン・猫・信号・工事は道路の上。工事が全部出ても全部の場所に行ける。周回の車は道路だけを走り工事にかからない', () => {
+  assert.deepEqual(MAP_IDS, ['shitamachi', 'minato', 'neon'])
+  for (const m of Object.values(MAPS)) {
+    const road = roadOf(m)
+    assert.equal(m.tiles.length, H); assert.ok(m.tiles.every(r => r.length === W))
+    assert.ok(road(m.start.x, m.start.y), m.id + ' start')
+    assert.equal(m.places.length, 15)
+    const closed = (x, y) => m.works.some(r => inRect(r, x, y))
+    const seen = new Set([Math.floor(m.start.x) + ',' + Math.floor(m.start.y)]), q = [[Math.floor(m.start.x), Math.floor(m.start.y)]]
+    for (let i = 0; i < q.length; i++) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = q[i][0] + dx, ny = q[i][1] + dy, k = nx + ',' + ny
+      if (seen.has(k) || isSolid(tileOf(m, nx + 0.5, ny + 0.5)) || closed(nx, ny)) continue
+      seen.add(k); q.push([nx, ny])
+    }
+    for (const p of m.places) {
+      assert.ok(road(p.x, p.y), `${m.id} ${p.name} は道路`)
+      assert.ok(seen.has(Math.floor(p.x) + ',' + Math.floor(p.y)), `${m.id} ${p.name} に工事中でも行ける`)
+      assert.ok(roadDist(m.start, p, m) > 0)
+    }
+    for (const [x, y] of m.cones) assert.ok(road(x, y) && !closed(Math.floor(x), Math.floor(y)), `${m.id} cone ${x},${y}`)
+    for (const c of m.cats) for (const f of [-0.9, 0, 0.9]) assert.ok(road(c.axis === 'x' ? c.x + f : c.x, c.axis === 'y' ? c.y + f : c.y), `${m.id} cat ${c.x},${c.y}`)
+    for (const l of m.lights) for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) assert.ok(road(l.x + dx + 0.5, l.y + dy + 0.5), `${m.id} light`)
+    for (const r of m.works) for (let y = r[1]; y <= r[3]; y++) for (let x = r[0]; x <= r[2]; x++) assert.ok(road(x + 0.5, y + 0.5), `${m.id} work ${r}`)
+    for (const l of m.loops) for (let i = 0; i < l.pts.length; i++) {
+      const a = l.pts[i], b = l.pts[(i + 1) % l.pts.length]
+      for (let k = 0; k <= 40; k++) {
+        const x = a[0] + (b[0] - a[0]) * k / 40, y = a[1] + (b[1] - a[1]) * k / 40
+        assert.ok(road(x, y), `${m.id} loop ${x},${y}`)
+        for (const r of m.works) assert.ok(!(x > r[0] - 0.5 && x < r[2] + 1.5 && y > r[1] - 0.5 && y < r[3] + 1.5), `${m.id} loop hits work ${r}`)
+      }
+    }
+  }
+})
+
+test('街は start の opts.map で選べる。知らない名前や変な値なら下町', () => {
+  for (const id of MAP_IDS) {
+    const g = createGame(players(1), { map: id })
+    assert.equal(g.view('p0').map, id)
+    assert.equal(g._debug.car.x, MAPS[id].start.x)
+  }
+  for (const bad of ['__proto__', 'constructor', 'toString', 123, null, { a: 1 }]) assert.equal(createGame(players(1), { map: bad }).view('p0').map, 'shitamachi')
+})
+
+test('3幕で難しくなる: 1/3 で車が増えて工事が始まり、2/3 で雨（滑る・幽霊が乗る・深夜料金）', () => {
+  process.env.TAXI_TIME_LIMIT = '30'
+  const g = game(1)
+  delete process.env.TAXI_TIME_LIMIT
+  const d = g._debug
+  run(g, READY_SEC + 1)
+  assert.equal(g.view('p0').ph, 0)
+  const npc0 = d.npcs.filter(n => n.on).length
+  assert.equal(g.view('p0').cl.length, 0, '最初は工事なし')
+  run(g, 10)
+  const v1 = g.view('p0')
+  assert.equal(v1.ph, 1)
+  assert.ok(d.npcs.filter(n => n.on).length > npc0, '車が増える')
+  assert.ok(v1.cl.length >= 1, '工事が始まる')
+  assert.ok(v1.ev.some(e => e.k === 'phase' && e.ph === 1), '幕の合図が出る')
+  // 工事の柵は通れない
+  const w = d.works.find(x => x.on)
+  const [x0, y0, x1, y1] = w.r
+  const horiz = x1 === x0 // 横道をふさぐ柵（縦に並ぶ）
+  const c = d.car
+  if (horiz) { c.x = x0 - 1.5; c.y = (y0 + y1 + 1) / 2; c.a = 0 } else { c.x = (x0 + x1 + 1) / 2; c.y = y0 + 2.5; c.a = -Math.PI / 2 }
+  c.vx = 0; c.vy = 0
+  drive(g, 'p0', ['accel'], 1.5)
+  assert.ok(!inRect(w.r, Math.floor(c.x), Math.floor(c.y)), '柵の中に入らない')
+  assert.ok(horiz ? c.x < x0 : c.y > y1 + 1, '柵の手前で止まる')
+  run(g, 10)
+  assert.equal(g.view('p0').ph, 2)
+  // 深夜は幽霊が乗ってくる（乱数を変えて何回か迎えに行く）
+  const kinds = new Set()
+  for (let i = 0; i < 12; i++) {
+    d.startPickup(); const at = d.job.at
+    c.x = at.x; c.y = at.y; c.vx = c.vy = 0
+    run(g, 0.6)
+    kinds.add(d.job.type.kind)
+  }
+  assert.ok(kinds.has('ghost'), '幽霊が乗る ' + [...kinds])
+})
+
+test('幕1の工事は、車が柵の場所にいる間は置かない（閉じ込めない）', () => {
+  process.env.TAXI_TIME_LIMIT = '30'
+  const g = game(1)
+  delete process.env.TAXI_TIME_LIMIT
+  const d = g._debug, c = d.car
+  run(g, READY_SEC + 9.5)
+  const w = d.works.find(x => x.from === 1)
+  const park = () => { c.x = w.r[0] + 0.5; c.y = w.r[1] + 0.5; c.vx = c.vy = 0 }
+  for (let i = 0; i < 20; i++) { park(); g.tick(1 / 15) }
+  assert.equal(g.view('p0').ph, 1)
+  assert.equal(w.on, false, '車がいる間は出ない')
+  c.x = 6.5; c.y = 11.5
+  run(g, 0.2)
+  assert.equal(w.on, true, '離れたら出る')
+})
+
+test('雨（第3幕）は同じ操作でも横に滑る', () => {
+  const slide = limitFrac => {
+    process.env.TAXI_TIME_LIMIT = '30'
+    const g = game(1)
+    delete process.env.TAXI_TIME_LIMIT
+    run(g, READY_SEC + 30 * limitFrac)
+    const c = g._debug.car
+    c.x = 2; c.y = 11.5; c.a = 0; c.vx = 6; c.vy = 0; c.spin = 0
+    let side = 0
+    for (let t = 0; t < 0.4; t += 1 / 15) {
+      g.input('p0', { type: 'hold', key: 'right', on: true }); g.input('p0', { type: 'hold', key: 'accel', on: true })
+      g.tick(1 / 15)
+      side += Math.abs(-c.vx * Math.sin(c.a) + c.vy * Math.cos(c.a))
+    }
+    return side
+  }
+  const dry = slide(0.05), wet = slide(0.8)
+  assert.ok(wet > dry * 1.2, `dry=${dry.toFixed(2)} wet=${wet.toFixed(2)}`)
+})
+
+test('信号: 赤で交差点に入ると罰金と機嫌、青なら何もない。周回の車は赤で止まる', () => {
+  const g = game(1)
+  run(g, READY_SEC + 0.1)
+  const d = g._debug, c = d.car, l = d.map.lights[0]
+  // 東西が赤になる時刻まで待つ
+  const t0 = d.clock - READY_SEC
+  let wait = 0
+  while (lightAt(l, t0 + wait).x !== 'r') wait += 0.05
+  run(g, wait + 0.1)
+  d.setMood(80)
+  const score0 = d.score + 1000
+  // 罰金を確かめるため先に売上を足しておく
+  const dest = d.job.dest; c.x = dest.x; c.y = dest.y; c.vx = c.vy = 0; run(g, 0.6)
+  const s1 = d.score
+  d.startPickup(); // 乗せ直さずに迎えに行く途中で信号無視
+  assert.ok(lightAt(l, d.clock - READY_SEC).x === 'r')
+  c.x = l.x - 0.4; c.y = l.y + 0.5; c.a = 0; c.vx = 4; c.vy = 0
+  g.tick(1 / 15); g.tick(1 / 15); g.tick(1 / 15)
+  assert.equal(d.stats.red, 1, '信号無視を数える')
+  assert.equal(d.score, Math.max(0, s1 - RED_FINE))
+  assert.ok(g.view('p0').ev.some(e => e.k === 'red'))
+  void score0
+  // 青のときは何もない
+  let w2 = 0
+  while (lightAt(l, d.clock - READY_SEC + w2).x !== 'g') w2 += 0.05
+  run(g, w2 + 0.1)
+  c.x = l.x - 0.4; c.y = l.y + 0.5; c.a = 0; c.vx = 4; c.vy = 0
+  g.tick(1 / 15); g.tick(1 / 15); g.tick(1 / 15)
+  assert.equal(d.stats.red, 1)
+})
+
+test('周回の車は赤信号の手前で待つ', () => {
+  const g = game(1)
+  run(g, READY_SEC + 0.1)
+  const d = g._debug
+  d.car.x = 2; d.car.y = 22.5 // 邪魔にならない所へ
+  const lights = d.map.lights
+  let stopped = 0
+  for (let i = 0; i < 60 * 30; i++) {
+    g.tick(1 / 60)
+    for (const n of d.npcs) {
+      if (!n.on) continue
+      const ax = Math.abs(Math.cos(n.a)) > 0.5 ? 'x' : 'y'
+      for (const l of lights) {
+        const nx = n.x + Math.cos(n.a) * 0.7, ny = n.y + Math.sin(n.a) * 0.7
+        const into = nx >= l.x && nx < l.x + 2 && ny >= l.y && ny < l.y + 2 && !(n.x >= l.x && n.x < l.x + 2 && n.y >= l.y && n.y < l.y + 2)
+        if (into && lightAt(l, d.clock - READY_SEC)[ax] === 'r') stopped++
+      }
+    }
+  }
+  assert.ok(stopped > 0, '赤の手前で待つ場面がある')
+})
+
+test('新しいお客さん: ちびっこは速いと喜ぶ。妊婦さんは時間内・無事故で上乗せ', () => {
+  const kinds = PAX_TYPES.map(t => t.kind)
+  for (const k of ['kid', 'mama', 'ghost']) assert.ok(kinds.includes(k))
+  const g = game(1)
+  run(g, READY_SEC + 0.1)
+  const d = g._debug, c = d.car
+  d.job.type = PAX_TYPES.find(t => t.kind === 'kid'); d.job.mood = 50
+  c.x = 2; c.y = 11.5; c.a = 0; c.vx = 6.5; c.vy = 0
+  for (let i = 0; i < 6; i++) { c.x = 2; c.vx = 6.5; c.vy = 0; g.input('p0', { type: 'hold', key: 'accel', on: true }); g.tick(1 / 15) }
+  assert.ok(d.job.mood > 50, 'ちびっこは速いと機嫌が上がる ' + d.job.mood)
+  // 妊婦さん
+  d.job.type = PAX_TYPES.find(t => t.kind === 'mama'); d.job.mood = 90; d.job.crashes = 0; d.job.rideT = 0
+  g.input('p0', { type: 'hold', key: 'accel', on: false })
+  const dest = d.job.dest; c.x = dest.x; c.y = dest.y; c.vx = c.vy = 0
+  run(g, 0.6)
+  const t = d.trips.at(-1)
+  assert.ok(t.note.includes('無事に間に合った'), t.note)
+  assert.ok(t.yen >= 400 + 500 + 500, '運賃+チップ+上乗せ ' + t.yen)
+})
+
+test('深夜料金: 第3幕に届けると運賃が1.3倍になる', () => {
+  const yenAt = frac => {
+    process.env.TAXI_TIME_LIMIT = '30'
+    const g = createGame(players(1), { rng: () => 0.01 })
+    delete process.env.TAXI_TIME_LIMIT
+    run(g, READY_SEC + 30 * frac)
+    const d = g._debug
+    d.job.type = PAX_TYPES[1]; d.job.mood = 90; d.job.par = 10; d.job.crashes = 0
+    const dest = d.job.dest; d.car.x = dest.x; d.car.y = dest.y; d.car.vx = d.car.vy = 0
+    run(g, 0.6)
+    return d.trips.at(-1)
+  }
+  const day = yenAt(0.05), night = yenAt(0.8)
+  assert.equal(night.yen, Math.round(day.yen * NIGHT_RATE / 10) * 10)
+  assert.ok(night.note.includes('深夜料金'))
+})
+
+test('結果に称号用の記録が入る（ぶつけた種類・最高速度・五つ星・信号無視）', () => {
+  const g = game(1)
+  run(g, READY_SEC + 0.1)
+  const c = g._debug.car
+  c.x = 4.5; c.y = 12; c.a = -Math.PI / 2
+  drive(g, 'p0', ['accel'], 2)
+  const r = (() => { for (let i = 0; i < 40 && !g.isOver(); i++) { c.x = 4.5; c.y = 11.6; c.a = -Math.PI / 2; c.vx = 0; c.vy = -7; run(g, 0.5) } return g.result() })()
+  assert.equal(r.reason, 'wreck')
+  assert.ok(r.stats.wall >= 2)
+  assert.ok(r.stats.maxKmh > 0)
+  for (const k of ['cone', 'cat', 'car', 'red', 'five', 'angry', 'ghost', 'calls']) assert.equal(typeof r.stats[k], 'number', k)
+  assert.equal(r.map, 'shitamachi')
+  assert.ok(JSON.stringify(r).length < 4000)
+})
+
+test('川に落ちそうになっても水の上には出ない（港町）', () => {
+  const g = createGame(players(1), { map: 'minato', rng: seq(0.1, 0.5) })
+  run(g, READY_SEC + 0.1)
+  const c = g._debug.car
+  c.x = 3.5; c.y = 9.8; c.a = Math.PI / 2; c.vx = 0; c.vy = 0 // 下（南）が川
+  // 北向きの道ではないので、区画の脇から南へ押し込む: (3.5, 9.8) は建物なので道の (1.5, 9.5) から
+  c.x = 1.5; c.y = 9; c.a = Math.PI / 2
+  drive(g, 'p0', ['accel'], 1.5)
+  assert.ok(tileOf(g._debug.map, c.x, c.y) !== 'w', '水に入らない')
+  assert.ok(g._debug.stats.water >= 1, '水にぶつかったと数える')
 })

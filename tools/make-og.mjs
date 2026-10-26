@@ -1,38 +1,46 @@
-// OGP画像（public/og.png 1200x630）を SVG から作る。使い方: node tools/make-og.mjs
+// OGP 画像（public/og.png, 1200x630）を作る。使い方: node tools/make-og.mjs
+// 1) サーバーを立てて1人で下町を走り出し、3D の画面だけを撮る（HUD は隠す）
+// 2) その上にタイトルのロゴ（index.html と同じ SVG）と一言を重ねる
 import { chromium } from 'playwright'
-const roles = ['ハンドル', 'エンジン', 'ナビ', '見張り', '接客']
-const windows = []
-for (let i = 6; i < 10; i++) for (let j = 0; j < 5; j++) if ((i * 7 + j * 3) % 5 < 3) windows.push(`<rect x="${40 + i * 120 + (j % 2) * 30}" y="${30 + j * 34}" width="16" height="16" fill="#ffd56a" opacity="${0.5 + ((i + j) % 3) * 0.2}"/>`)
-const html = `<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0}svg{display:block}</style></head><body>
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <defs>
-    <radialGradient id="beam" cx="0" cy="0.5" r="1"><stop offset="0" stop-color="#fffbe0" stop-opacity=".55"/><stop offset="1" stop-color="#fffbe0" stop-opacity="0"/></radialGradient>
-  </defs>
-  <rect width="1200" height="630" fill="#14161c"/>
-  <rect x="0" y="0" width="1200" height="230" fill="#2a2640"/>
-  ${windows.join('')}
-  <rect x="0" y="230" width="1200" height="300" fill="#2b2f3a"/>
-  <path d="M0 380H1200" stroke="#c9b45a" stroke-width="6" stroke-dasharray="40 34"/>
-  <rect x="0" y="530" width="1200" height="100" fill="#1f2230"/>
-  <path d="M690 330 L1200 220 L1200 520 Z" fill="url(#beam)"/>
-  <g transform="translate(430 270) rotate(-5)">
-    <rect x="0" y="40" width="270" height="90" rx="24" fill="#ffcf3a"/>
-    <rect x="60" y="0" width="140" height="56" rx="16" fill="#ffcf3a"/>
-    <rect x="72" y="10" width="54" height="36" rx="6" fill="#1b2230"/><rect x="134" y="10" width="54" height="36" rx="6" fill="#1b2230"/>
-    <rect x="95" y="-26" width="70" height="26" rx="6" fill="#fff7d6"/><text x="130" y="-7" font-size="18" font-weight="900" text-anchor="middle" fill="#1a1400" font-family="Hiragino Sans, sans-serif">TAXI</text>
-    ${Array.from({ length: 12 }, (_, i) => `<rect x="${30 + i * 18}" y="80" width="18" height="14" fill="${i % 2 ? '#1a1400' : '#fff7d6'}"/>`).join('')}
-    <circle cx="62" cy="130" r="24" fill="#0b0d12"/><circle cx="210" cy="130" r="24" fill="#0b0d12"/>
-    <rect x="258" y="60" width="14" height="18" rx="3" fill="#fffbe0"/>
-  </g>
-  <path d="M400 330h-120M390 370H220M405 410H300" stroke="#9aa3b2" stroke-width="10" stroke-linecap="round" opacity=".7"/>
-  <g transform="translate(980 420)"><path d="M0 -34 26 18H-26Z" fill="#ff7a1a"/><rect x="-14" y="-6" width="28" height="8" fill="#fff"/></g>
-  <text x="60" y="118" font-size="104" font-weight="900" fill="#fff" font-family="Hiragino Sans, sans-serif" letter-spacing="4">暴走タクシー</text>
-  <text x="64" y="186" font-size="38" font-weight="700" fill="#ffcf3a" font-family="Hiragino Sans, sans-serif">みんなで1台を運転する協力ゲーム</text>
-  ${roles.map((r, i) => `<g transform="translate(${60 + i * 216} 552)"><rect width="196" height="56" rx="28" fill="#14161c" stroke="#ffcf3a" stroke-width="3"/><text x="98" y="38" font-size="28" font-weight="800" text-anchor="middle" fill="#fff" font-family="Hiragino Sans, sans-serif">${r}</text></g>`).join('')}
-</svg></body></html>`
-const b = await chromium.launch()
-const p = await b.newPage({ viewport: { width: 1200, height: 630 } })
-await p.setContent(html)
-await p.screenshot({ path: new URL('../public/og.png', import.meta.url).pathname })
-await b.close()
+import { readFile } from 'node:fs/promises'
+import { startServer } from '../server.mjs'
+
+const OUT = new URL('../public/og.png', import.meta.url).pathname
+const srv = await startServer({ port: 0, quiet: true })
+const base = `http://localhost:${srv.port}`
+const b = await chromium.launch({ channel: 'chromium', args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] })
+const h = await (await b.newContext({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 1.5, locale: 'ja-JP' })).newPage()
+await h.goto(base); await h.fill('#name', 'たろう'); await h.click('#createBtn'); await h.waitForSelector('#lobby:not([hidden])')
+for (let i = 0; i < 4 && await h.getAttribute('#mapPick .pk-body', 'data-id') !== (process.env.MAP || 'neon'); i++) await h.click('#mapPick .pk-btn[data-d="1"]')
+await h.click('#startBtn')
+await h.waitForFunction(() => window.__taxi && window.__taxi.st === 'drive', null, { timeout: 10000 })
+await h.keyboard.down('ArrowUp'); await h.waitForTimeout(650); await h.keyboard.up('ArrowUp')
+await h.keyboard.down('ArrowRight'); await h.waitForTimeout(120); await h.keyboard.up('ArrowRight')
+await h.waitForTimeout(150)
+await h.evaluate(() => window.__tx.fx({ k: 'deliver', name: '受験生', kind: 'hurry', stars: 5, yen: 1340, note: '' }))
+await h.waitForTimeout(260)
+await h.addStyleTag({ content: '.hud-top,.hud-sub,.dash,.mini,.dock,.pops,.banner,#quitBtn,.callbox,.labels{display:none!important}' })
+await h.waitForTimeout(60)
+const shot = await h.locator('#t-wrap').screenshot()
+const bg = 'data:image/png;base64,' + shot.toString('base64')
+const logo = (await readFile(new URL('../public/index.html', import.meta.url), 'utf8')).match(/<svg class="logo-svg"[\s\S]*?<\/svg>/)[0]
+const og = await (await b.newContext({ viewport: { width: 1200, height: 630 } })).newPage()
+await og.setContent(`<!doctype html><html><head><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@900&display=swap"><style>
+  body{margin:0;width:1200px;height:630px;position:relative;overflow:hidden;font-family:"M PLUS Rounded 1c",sans-serif}
+  .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(11,8,32,.75),rgba(11,8,32,.15) 55%,transparent)}
+  .logo{position:absolute;left:10px;top:20px;width:600px;filter:drop-shadow(0 8px 0 rgba(0,0,0,.35))}
+  .logo svg{width:100%;height:auto}
+  .hand{position:absolute;margin:0;font-family:"Dela Gothic One",sans-serif;color:#fff;font-size:38px;line-height:1.3;transform:rotate(-3deg);text-shadow:3px 0 0 #14110c,-3px 0 0 #14110c,0 3px 0 #14110c,0 -3px 0 #14110c,2px 2px 0 #14110c,-2px 2px 0 #14110c,2px -2px 0 #14110c,-2px -2px 0 #14110c}
+  .roles{position:absolute;left:40px;bottom:36px;display:flex;gap:10px}
+  .roles span{font-family:"Dela Gothic One",sans-serif;font-size:26px;padding:6px 16px;border-radius:99px;border:4px solid #14110c;box-shadow:0 5px 0 #14110c}
+</style></head><body><img class="bg" src="${bg}"><div class="shade"></div><div class="logo">${logo}</div>
+<p class="hand" style="left:46px;top:330px;color:#ffcf3a">1台をみんなで運転！</p>
+<p class="hand" style="left:46px;top:384px;font-size:30px">声をかけ合わないと曲がれない</p>
+<div class="roles"><span style="background:#ffcf3a">ハンドル</span><span style="background:#2fcf7f">エンジン</span><span style="background:#5ad1ff">ナビ</span><span style="background:#ff8ab0">見張り</span><span style="background:#c79bff">接客</span></div>
+</body></html>`)
+await og.waitForLoadState('networkidle').catch(() => {})
+await og.evaluate(() => document.fonts.ready)
+await og.screenshot({ path: OUT })
+await b.close(); await srv.close()
 console.log('public/og.png')

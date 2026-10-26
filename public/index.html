@@ -4,108 +4,171 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>暴走タクシー | みんなで1台を運転する協力ゲーム</title>
-<meta name="description" content="3〜6人で1台のタクシーを動かす協力ゲーム。ハンドル、アクセル、ナビ、見張り、接客。担当ごとに見えるものが違うから、声をかけ合わないと曲がれない。リンクを送るだけでスマホから遊べる。">
+<meta name="description" content="1〜6人で1台のタクシーを動かす協力ゲーム。ハンドル、アクセル、ナビ、見張り、接客。担当ごとに見えるものが違うから、声をかけ合わないと曲がれない。下町・港町・繁華街の3つの街、ラッシュと嵐の深夜まで。リンクを送るだけでスマホから遊べる。">
 <meta property="og:type" content="website">
 <meta property="og:title" content="暴走タクシー | みんなで1台を運転する協力ゲーム">
-<meta property="og:description" content="3〜6人で1台のタクシーを動かす協力ゲーム。ハンドル、アクセル、ナビ、見張り、接客。担当ごとに見えるものが違うから、声をかけ合わないと曲がれない。リンクを送るだけでスマホから遊べる。">
+<meta property="og:description" content="ハンドル・アクセル・ナビ・見張り・接客。担当ごとに見えるものが違うから、声をかけ合わないと曲がれない。夜の街をみんなで1台のタクシーで走る。スマホで1〜6人。">
 <meta property="og:image" content="/og.png">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#14161c">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="暴走タクシー">
-<meta name="twitter:description" content="3〜6人で1台のタクシーを動かす協力ゲーム。ハンドル、アクセル、ナビ、見張り、接客。担当ごとに見えるものが違うから、声をかけ合わないと曲がれない。リンクを送るだけでスマホから遊べる。">
+<meta name="twitter:description" content="ハンドル・アクセル・ナビ・見張り・接客。担当ごとに見えるものが違うから、声をかけ合わないと曲がれない。スマホで1〜6人。">
 <meta name="twitter:image" content="/og.png">
+<meta name="theme-color" content="#16122a">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@500;800;900&display=swap">
 <link rel="stylesheet" href="/style.css">
 <script>
   // 起動に失敗したときに原因を画面に出す（module の読み込み自体が失敗すると中の catch は動かないため、素の script で拾う）
   window.__errs = []
   window.addEventListener('error', e => window.__errs.push(e.message || String(e)))
   window.addEventListener('unhandledrejection', e => window.__errs.push(String(e.reason)))
-  setTimeout(() => {
+  // 遅い回線では 3D の読み込みに時間がかかるので、エラーが出たとき（8秒）か、20秒たっても起動しないときだけ出す。後から起動できたら app.js が消す
+  const showBootErr = () => {
     if (window.__boot) return
     const d = document.getElementById('bootErr')
     d.hidden = false
     d.textContent = '起動できませんでした: ' + (window.__errs.join(' / ') || '読み込み失敗') + ' / ' + navigator.userAgent
-  }, 5000)
-</script>
-<script>
-  // ピンチ・ダブルタップ・Ctrl+ホイールでの拡大を止める
-  ;['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive: false }))
-  document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault() }, { passive: false })
-  let lastTouchEnd = 0
-  document.addEventListener('touchend', e => { const now = Date.now(); if (now - lastTouchEnd < 350 && !e.target.closest('input,button,summary')) e.preventDefault(); lastTouchEnd = now }, { passive: false })
-  document.addEventListener('dblclick', e => e.preventDefault(), { passive: false })
-  window.addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault() }, { passive: false })
-  window.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && ['+', '-', '=', '0', ';'].includes(e.key)) e.preventDefault() })
+  }
+  setTimeout(() => { if (window.__errs.length) showBootErr() }, 8000)
+  setTimeout(showBootErr, 20000)
+  // ブラウザの拡大を止める（iOS は viewport の指定を無視するため）
+  ;(function () {
+    const stop = e => e.preventDefault()
+    for (const t of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(t, stop, { passive: false })
+    document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault() }, { passive: false })
+    let lastEnd = 0
+    document.addEventListener('touchend', e => {
+      const now = Date.now()
+      if (now - lastEnd < 350 && !e.target.closest('input, button, summary, label, a')) e.preventDefault()
+      lastEnd = now
+    }, { passive: false })
+    document.addEventListener('dblclick', stop, { passive: false })
+    document.addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault() }, { passive: false })
+    document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && ['+', '-', '=', '0', ';'].includes(e.key)) e.preventDefault() })
+  })()
 </script>
 </head>
-<body>
+<body data-screen="home">
 <div id="bootErr" class="boot-err" hidden></div>
+<div class="city" aria-hidden="true"><i class="moon"></i><i class="sky1"></i><i class="sky2"></i><i class="road"></i></div>
 
 <header class="top">
-  <span class="logo" id="logo">暴走タクシー</span>
+  <span class="mini-logo"><svg viewBox="0 0 32 24" aria-hidden="true"><rect x="2" y="9" width="28" height="9" rx="3" fill="#ffcf3a" stroke="#14110c" stroke-width="2"/><path d="M8 9l3-5h10l3 5" fill="#ffcf3a" stroke="#14110c" stroke-width="2" stroke-linejoin="round"/><rect x="13" y="1" width="6" height="3" fill="#fff7d6" stroke="#14110c" stroke-width="1.5"/><circle cx="9" cy="19" r="3" fill="#14110c"/><circle cx="23" cy="19" r="3" fill="#14110c"/></svg>暴走タクシー</span>
   <span class="net" id="net" data-s="connecting">接続しています</span>
 </header>
 
 <main>
-  <section id="home" class="card" hidden>
-    <svg class="home-art" viewBox="0 0 320 64" aria-hidden="true">
-      <rect x="0" y="40" width="320" height="24" fill="#2b2f3a"/><path d="M0 52h320" stroke="#c9b45a" stroke-width="2" stroke-dasharray="12 12"/>
-      <g transform="translate(118 18) rotate(-6)"><rect x="0" y="12" width="84" height="26" rx="8" fill="#ffcf3a"/><rect x="18" y="0" width="44" height="16" rx="5" fill="#ffcf3a"/><rect x="22" y="3" width="16" height="10" rx="2" fill="#1b2230"/><rect x="42" y="3" width="16" height="10" rx="2" fill="#1b2230"/><rect x="30" y="-7" width="20" height="8" rx="2" fill="#fff7d6"/><circle cx="20" cy="38" r="7" fill="#11141a"/><circle cx="64" cy="38" r="7" fill="#11141a"/><rect x="80" y="18" width="6" height="6" fill="#fffbe0"/><path d="M90 16 120 8M90 24l34 0M90 30l30 8" stroke="#fffbe0" stroke-width="2" opacity=".5"/></g>
-      <path d="M96 30h-26M100 40H60M94 50H74" stroke="#9aa3b2" stroke-width="3" stroke-linecap="round"/>
-    </svg>
-    <h1 id="homeTitle">暴走タクシー</h1>
-    <p id="homeLead" class="lead">みんなで1台のタクシーを運転して、お客さんを目的地まで届ける。担当ごとに見えるものが違うから、声をかけ合わないと曲がれない。</p>
-    <label class="field">ニックネーム
-      <input id="name" maxlength="12" autocomplete="nickname" placeholder="例: たろう" enterkeyhint="done">
-    </label>
-    <button id="createBtn" class="primary">部屋を作る</button>
-    <details id="joinBox">
-      <summary>参加コードで入る</summary>
-      <div class="row">
-        <input id="code" maxlength="4" inputmode="latin" autocapitalize="characters" placeholder="ABCD" aria-label="参加コード">
-        <button id="joinBtn">参加</button>
+  <section id="home" class="screen" hidden>
+    <div class="hero">
+      <svg class="logo-svg" viewBox="0 0 440 250" role="img" aria-label="暴走タクシー">
+        <defs>
+          <linearGradient id="lgTaxi" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff59a"/><stop offset=".5" stop-color="#ffcf3a"/><stop offset="1" stop-color="#ff9a12"/></linearGradient>
+          <pattern id="pChk" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#14110c"/><rect width="8" height="8" fill="#fff"/><rect x="8" y="8" width="8" height="8" fill="#fff"/></pattern>
+        </defs>
+        <g transform="rotate(-6 220 125)">
+          <path d="M26 58 L94 40 L170 50 L250 26 L336 40 L420 30 L410 92 L428 150 L396 192 L410 230 L330 220 L250 236 L170 222 L92 232 L30 214 L44 160 L14 112 Z" fill="#14110c"/>
+          <path d="M4 100l-8 4M424 64l14-6M386 236l14 10M30 230l-10 12M330 22l6-12" stroke="#14110c" stroke-width="7" stroke-linecap="round"/>
+          <rect x="44" y="118" width="360" height="16" fill="url(#pChk)" opacity=".95"/>
+          <text x="56" y="106" font-family="Dela Gothic One, Hiragino Sans, sans-serif" font-size="66" fill="#ffffff" stroke="#14110c" stroke-width="5" paint-order="stroke" letter-spacing="6">暴走</text>
+          <text x="40" y="210" font-family="Dela Gothic One, Hiragino Sans, sans-serif" font-size="78" fill="url(#lgTaxi)" stroke="#14110c" stroke-width="7" paint-order="stroke">タクシー</text>
+          <g transform="translate(300 52) rotate(8)">
+            <path d="M-70 26h-40M-64 40h-56M-70 54h-34" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".9"/>
+            <rect x="-48" y="18" width="104" height="34" rx="10" fill="#ffcf3a" stroke="#14110c" stroke-width="5"/>
+            <path d="M-26 18l12-20h40l12 20z" fill="#ffcf3a" stroke="#14110c" stroke-width="5" stroke-linejoin="round"/>
+            <path d="M-17 15l8-13h14v13zM9 15V2h14l8 13z" fill="#5ad1ff" stroke="#14110c" stroke-width="3"/>
+            <rect x="-4" y="-14" width="22" height="12" rx="2" fill="#fff7d6" stroke="#14110c" stroke-width="3"/>
+            <rect x="-46" y="30" width="100" height="7" fill="url(#pChk)"/>
+            <circle cx="-22" cy="54" r="11" fill="#14110c"/><circle cx="34" cy="54" r="11" fill="#14110c"/>
+            <circle cx="-22" cy="54" r="4" fill="#d0d4dc"/><circle cx="34" cy="54" r="4" fill="#d0d4dc"/>
+            <path d="M58 28l26-8M58 36l30 2" stroke="#fffbe0" stroke-width="4" stroke-linecap="round"/>
+          </g>
+        </g>
+      </svg>
+      <p class="hand hand-1">1台を<br>みんなで運転！</p>
+      <p class="hand hand-2">曲がれ！止まれ！<br>お客さんが怒ってる！</p>
+    </div>
+    <div class="slip">
+      <p class="slip-head"><span>乗務員証</span><span>声をかけ合わないと曲がれない</span></p>
+      <label class="field"><span>あなたの名前</span>
+        <input id="name" maxlength="12" autocomplete="nickname" placeholder="例: たろう" enterkeyhint="done">
+      </label>
+      <button id="createBtn" class="btn primary">部屋を作る</button>
+      <details id="joinBox">
+        <summary>参加コードで入る</summary>
+        <div class="row">
+          <input id="code" maxlength="4" inputmode="latin" autocapitalize="characters" placeholder="ABCD" aria-label="参加コード">
+          <button id="joinBtn" class="btn">参加</button>
+        </div>
+      </details>
+      <div class="row home-sub">
+        <button id="howBtn" class="btn ghost grow">遊び方</button>
+        <button id="recBtn" class="btn ghost grow">記録と称号</button>
       </div>
-    </details>
-    <div id="howto" class="howto">
-      <ul>
-        <li><b>ハンドル</b>は左右、<b>エンジン</b>はアクセルとブレーキだけ</li>
-        <li>行き先の地図は<b>ナビ</b>、夜道の障害物は<b>見張り</b>、お客さんの注文は<b>接客</b>にしか見えない</li>
-        <li>光る輪の中で止まると乗り降り。150秒で3,000円を目指す</li>
-      </ul>
-      <p class="muted">推奨3〜6人。1〜2人なら1人が複数を担当する</p>
     </div>
   </section>
 
-  <section id="lobby" class="card" hidden>
-    <p class="muted">参加コード</p>
-    <p class="code" id="roomCode"></p>
-    <div class="row">
-      <input id="invite" readonly aria-label="招待URL">
-      <button id="copyBtn">招待</button>
+  <section id="lobby" class="screen" hidden>
+    <div class="slip lobby">
+      <div class="lobby-top">
+        <div><p class="muted">参加コード</p><p class="code" id="roomCode"></p></div>
+        <p class="count" id="count"></p>
+      </div>
+      <div class="row invite-row">
+        <input id="invite" readonly aria-label="招待URL">
+        <button id="copyBtn" class="btn">招待</button>
+      </div>
+      <ul id="players" class="players"></ul>
+      <div class="pick" id="mapPick"></div>
+      <p id="lobbyHint" class="hint"></p>
+      <div class="row lobby-actions">
+        <button id="leaveBtn" class="btn ghost">部屋を出る</button>
+        <button id="startBtn" class="btn primary grow" hidden>出発</button>
+      </div>
     </div>
-    <p class="muted"><span id="count"></span></p>
-    <ul id="players" class="players"></ul>
-    <p id="lobbyHint" class="hint"></p>
-    <button id="startBtn" class="primary" hidden>スタート</button>
-    <button id="leaveBtn" class="ghost">部屋を出る</button>
   </section>
 
   <section id="game" hidden>
     <div id="stage" class="stage"></div>
-    <button id="quitBtn" class="ghost small quit">退出</button>
+    <button id="quitBtn" class="btn small quit" aria-label="退出"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
   </section>
 
-  <section id="result" class="card" hidden>
-    <h2 id="resultTitle" class="result-title"></h2>
-    <div id="resultBody"></div>
-    <p id="resultHint" class="hint"></p>
-    <button id="rematchBtn" class="primary" hidden>もう一回</button>
-    <button id="lobbyBtn" class="ghost" hidden>ロビーに戻る</button>
+  <section id="result" class="screen" hidden>
+    <div class="slip result">
+      <h2 id="resultTitle" class="result-title"></h2>
+      <div id="resultBody"></div>
+      <p id="resultHint" class="hint"></p>
+      <div class="row result-actions">
+        <button id="lobbyBtn" class="btn ghost" hidden>ロビーへ</button>
+        <button id="rematchBtn" class="btn primary grow" hidden>もう一回</button>
+      </div>
+    </div>
   </section>
 </main>
+
+<div id="howto" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="howtoTitle">
+  <div class="slip modal-card">
+    <p class="slip-head" id="howtoTitle"><span>遊び方</span><span>3つだけ</span></p>
+    <ol class="steps">
+      <li><svg viewBox="0 0 80 64" aria-hidden="true"><rect x="4" y="6" width="34" height="24" rx="6" fill="#ffcf3a" stroke="#14110c" stroke-width="3"/><path d="M16 18l-5 0m0 0 4-4m-4 4 4 4M26 18h5m0 0-4-4m4 4-4 4" stroke="#14110c" stroke-width="2.5" fill="none" stroke-linecap="round"/><rect x="42" y="6" width="34" height="24" rx="6" fill="#2fcf7f" stroke="#14110c" stroke-width="3"/><path d="M53 24l6-11 6 11" fill="none" stroke="#14110c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="4" y="34" width="34" height="24" rx="6" fill="#5ad1ff" stroke="#14110c" stroke-width="3"/><path d="M12 52V40l7 4 7-4v12" fill="none" stroke="#14110c" stroke-width="2.4" stroke-linejoin="round"/><rect x="42" y="34" width="34" height="24" rx="6" fill="#ff8ab0" stroke="#14110c" stroke-width="3"/><circle cx="59" cy="46" r="6" fill="#fff" stroke="#14110c" stroke-width="2.4"/><circle cx="59" cy="46" r="2" fill="#14110c"/></svg><p><b>担当が1人ずつ決まる</b>ハンドル・エンジン・ナビ・見張り・接客。見えるものも押せるボタンも違う</p></li>
+      <li><svg viewBox="0 0 80 64" aria-hidden="true"><rect x="6" y="10" width="68" height="40" rx="18" fill="#fff8e6" stroke="#14110c" stroke-width="3"/><path d="M26 54l6-6h10" fill="#fff8e6" stroke="#14110c" stroke-width="3"/><text x="40" y="36" text-anchor="middle" font-family="Dela Gothic One, sans-serif" font-size="15" fill="#14110c">次を右！</text></svg><p><b>声をかけ合う</b>行き先はナビ、夜道の障害物は見張り、お客さんの注文は接客にしか分からない。口で言うか掛け声ボタン</p></li>
+      <li><svg viewBox="0 0 80 64" aria-hidden="true"><ellipse cx="40" cy="48" rx="32" ry="10" fill="none" stroke="#2fcf7f" stroke-width="4"/><rect x="22" y="30" width="36" height="16" rx="5" fill="#ffcf3a" stroke="#14110c" stroke-width="3"/><circle cx="40" cy="17" r="10" fill="#ffd9b3" stroke="#14110c" stroke-width="2.5"/><circle cx="36" cy="16" r="1.6" fill="#14110c"/><circle cx="44" cy="16" r="1.6" fill="#14110c"/><path d="M35 20q5 4 10 0" fill="none" stroke="#14110c" stroke-width="2"/></svg><p><b>光る輪の中で止まる</b>お客さんが乗る・降りる。時間内に売上3,000円。だんだん車が増え、工事が始まり、最後は嵐の深夜</p></li>
+    </ol>
+    <p class="howto-s">アクセルは1回押すと入りっぱなし、もう1回で離す。ブレーキは押している間だけ効き、止まってから押し続けるとバック。PC は矢印キー、数字キーで掛け声、C でなだめる</p>
+    <button id="howClose" class="btn primary">わかった</button>
+  </div>
+</div>
+
+<div id="records" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="recTitle">
+  <div class="slip modal-card">
+    <p class="slip-head" id="recTitle"><span>記録と称号</span><span id="recCount"></span></p>
+    <div id="recBody" class="rec-body"></div>
+    <button id="recClose" class="btn primary">閉じる</button>
+  </div>
+</div>
 
 <div id="toast" class="toast" role="status" hidden></div>
 <footer class="foot"><span id="ping"></span></footer>
