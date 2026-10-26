@@ -112,6 +112,7 @@ node tools/e2e.mjs       # 実ブラウザで通しプレイ（193項目）
 | `node tools/shot-result.mjs` | 結果画面（6人・称号3つ・勝ち／廃車）を4サイズで |
 | `node tools/shot-fx.mjs` | 届けた・怒って降りた・猫・信号無視・嵐の深夜・営業終了の演出 |
 | `node tools/fps.mjs` | GPU を使う headless Chromium で、スマホ相当（390x844・画素比3）と横持ちの fps を3つの街で。比べる基準に空のページの fps も出す |
+| `node tools/live-check.mjs <URL>` | 公開URL（省くと手元）に chromium と webkit の2人でつなぎ、操作・掛け声・3D・OGP・起動エラーの誤表示（20秒）を確かめる |
 | `node tools/make-og.mjs` | `public/og.png`（1200x630）を作り直す（3D の画面にロゴと一言） |
 
 ## 公開
